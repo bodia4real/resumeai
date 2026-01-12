@@ -52,6 +52,71 @@ def call_openai(system_prompt, user_message, model="gpt-4.1-nano", temperature=0
         raise Exception(f"OpenAI API error: {str(e)}")
 
 
+def analyze_skills_streaming(job_description, resume_text=None):
+    """
+    Analyze skills from job description with AI streaming.
+    Optionally compare against candidate's resume.
+    Yields chunks of text as they're generated.
+    
+    Args:
+        job_description (str): Target job description
+        resume_text (str): Optional candidate's resume for gap analysis
+    
+    Yields:
+        str: Chunks of skills analysis as they're generated
+    """
+    system_prompt = """You are an expert skills analyst and career coach. Analyze job descriptions to identify:
+1. **Required Skills** (must-have, deal-breakers)
+2. **Nice-to-Have Skills** (preferred, bonus skills)
+3. **Technical Skills** (programming languages, tools, frameworks)
+4. **Soft Skills** (communication, leadership, teamwork)
+5. **Experience Level** (junior, mid, senior indicators)
+
+If a resume is provided, also include:
+- **Skills Gap Analysis**: What skills the candidate is missing
+- **Matching Skills**: What skills the candidate already has
+- **Recommendations**: Specific areas to highlight or improve
+
+Format your response clearly with headers and bullet points. Be specific and actionable."""
+
+    if resume_text:
+        user_message = f"""Analyze the skills required for this job and compare against the candidate's resume:
+
+JOB DESCRIPTION:
+{job_description}
+
+CANDIDATE'S RESUME:
+{resume_text}
+
+Provide a comprehensive skills analysis including required vs nice-to-have skills, and a gap analysis showing what the candidate has vs what's missing."""
+    else:
+        user_message = f"""Analyze the skills required for this job:
+
+JOB DESCRIPTION:
+{job_description}
+
+Provide a comprehensive breakdown of required vs nice-to-have skills, technical vs soft skills, and the experience level expected."""
+
+    try:
+        client = get_openai_client()
+        stream = client.chat.completions.create(
+            model="gpt-4.1-nano",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ],
+            temperature=0.5,
+            stream=True
+        )
+        
+        for chunk in stream:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+                
+    except Exception as e:
+        raise Exception(f"OpenAI API error: {str(e)}")
+
+
 def tailor_resume_streaming(resume_text, job_description, examples_prompt):
     """
     Tailor a resume to match a specific job description with streaming.

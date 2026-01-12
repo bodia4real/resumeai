@@ -7,7 +7,7 @@ from documents.models import Document
 from .models import AIGeneration
 from .serializers import AIGenerationSerializer
 from .services.resume_parser import extract_text_from_document
-from .services.openai_service import tailor_resume_streaming, generate_cover_letter, generate_interview_prep
+from .services.openai_service import tailor_resume_streaming, generate_cover_letter, generate_interview_prep, analyze_skills_streaming
 from .services.prompts import get_resume_tailoring_prompt, get_interview_prep_prompt
 import tempfile
 import os
@@ -368,6 +368,118 @@ def generate_interview_prep_view(request):
 
 
 @api_view(['GET'])
+def analyze_skills_view(request):
+    """
+    Analyze skills from job description, optionally compare with resume.
+    Streams the response in real-time as AI generates it.
+    
+    POST /api/ai/analyze-skills/
+    Headers: Authorization: Bearer TOKEN
+    Body: form-data
+        job_description: "..." (required)
+        file: resume.pdf (optional - for gap analysis)
+        application_id: 10 (optional)
+    
+    Returns: Streaming response with skills analysis
+    """
+    # 1. Get job description
+    job_description = request.data.get('job_description', '').strip()
+    application_id = request.data.get('application_id')
+    
+    if not job_description:
+        return Response(
+            {'error': 'job_description is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    if len(job_description) < 50:
+        return Response(
+            {'error': 'Job description is too short (minimum 50 characters)'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # 2. Optionally extract text from uploaded resume
+    resume_text = None
+    if 'file' in request.FILES:
+        uploaded_file = request.FILES['file']
+        
+        # Validate file extension
+        allowed_extensions = ['.pdf', '.docx', '.doc', '.txt']
+        file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+        if file_ext not in allowed_extensions:
+            return Response(
+                {'error': f'Unsupported file type. Allowed: {", ".join(allowed_extensions)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        temp_file = None
+        try:
+            # Create temporary file with proper extension
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=file_ext)
+            for chunk in uploaded_file.chunks():
+                temp_file.write(chunk)
+            temp_file.close()
+            
+            # Extract text from temporary file
+            resume_text = extract_text_from_document(temp_file.name)
+            if not resume_text or len(resume_text.strip()) < 50:
+                return Response(
+                    {'error': 'Could not extract sufficient text from document'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except Exception as e:
+            return Response(
+                {'error': f'Error reading document: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        finally:
+            # Clean up temporary file
+            if temp_file and os.path.exists(temp_file.name):
+                os.unlink(temp_file.name)
+    
+    # 3. Stream the AI response
+    def generate_stream():
+        """Generator function that yields AI-generated chunks"""
+        full_response = []
+        
+        try:
+            for chunk in analyze_skills_streaming(job_description, resume_text):
+                full_response.append(chunk)
+                # Send chunk to client
+                yield chunk
+            
+            # After streaming completes, save to database in background
+            final_text = ''.join(full_response)
+            try:
+                AIGeneration.objects.create(
+                    user=request.user,
+                    application_id=application_id,
+                    generation_type='skills_analysis',
+                    input_resume=resume_text[:5000] if resume_text else None,
+                    job_description=job_description[:5000],
+                    output_text=final_text,
+                    model_used='gpt-4.1-nano',
+                    tokens_used=None
+                )
+            except:
+                pass
+                
+        except Exception as e:
+            yield f"\n\n[ERROR: {str(e)}]"
+    
+    # Return streaming response
+    response = StreamingHttpResponse(
+        generate_stream(),
+        content_type='text/plain; charset=utf-8'
+    )
+    response['Cache-Control'] = 'no-cache'
+    response['X-Accel-Buffering'] = 'no'
+    
+    return response
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 @permission_classes([IsAuthenticated])
 def list_generations_view(request):
     """
