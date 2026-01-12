@@ -52,71 +52,6 @@ def call_openai(system_prompt, user_message, model="gpt-4.1-nano", temperature=0
         raise Exception(f"OpenAI API error: {str(e)}")
 
 
-def analyze_skills_streaming(job_description, resume_text=None):
-    """
-    Analyze skills from job description with AI streaming.
-    Optionally compare against candidate's resume.
-    Yields chunks of text as they're generated.
-    
-    Args:
-        job_description (str): Target job description
-        resume_text (str): Optional candidate's resume for gap analysis
-    
-    Yields:
-        str: Chunks of skills analysis as they're generated
-    """
-    system_prompt = """You are an expert skills analyst and career coach. Analyze job descriptions to identify:
-1. **Required Skills** (must-have, deal-breakers)
-2. **Nice-to-Have Skills** (preferred, bonus skills)
-3. **Technical Skills** (programming languages, tools, frameworks)
-4. **Soft Skills** (communication, leadership, teamwork)
-5. **Experience Level** (junior, mid, senior indicators)
-
-If a resume is provided, also include:
-- **Skills Gap Analysis**: What skills the candidate is missing
-- **Matching Skills**: What skills the candidate already has
-- **Recommendations**: Specific areas to highlight or improve
-
-Format your response clearly with headers and bullet points. Be specific and actionable."""
-
-    if resume_text:
-        user_message = f"""Analyze the skills required for this job and compare against the candidate's resume:
-
-JOB DESCRIPTION:
-{job_description}
-
-CANDIDATE'S RESUME:
-{resume_text}
-
-Provide a comprehensive skills analysis including required vs nice-to-have skills, and a gap analysis showing what the candidate has vs what's missing."""
-    else:
-        user_message = f"""Analyze the skills required for this job:
-
-JOB DESCRIPTION:
-{job_description}
-
-Provide a comprehensive breakdown of required vs nice-to-have skills, technical vs soft skills, and the experience level expected."""
-
-    try:
-        client = get_openai_client()
-        stream = client.chat.completions.create(
-            model="gpt-4.1-nano",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
-            ],
-            temperature=0.5,
-            stream=True
-        )
-        
-        for chunk in stream:
-            if chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
-                
-    except Exception as e:
-        raise Exception(f"OpenAI API error: {str(e)}")
-
-
 def tailor_resume_streaming(resume_text, job_description, examples_prompt):
     """
     Tailor a resume to match a specific job description with streaming.
@@ -236,16 +171,20 @@ def generate_interview_prep(resume_text, job_description):
     Yields:
         str: Chunks of interview prep content as they're generated
     """
-    system_prompt = """You are an expert interview coach. Generate comprehensive interview preparation materials that include:
-1. Common questions for this role (8-10 questions)
-2. STAR method answer examples based on the candidate's experience
-3. Questions the candidate should ask the interviewer
-4. Key talking points and achievements to emphasize
-5. Company-specific insights if the job description includes company information
+    system_prompt = """You are an expert interview coach. Generate a focused interview prep packet that ALWAYS includes:
+1) Exactly 10 questions total, clearly tagged as [Technical] or [Behavioral] (aim ~6/4 split)
+2) For each question: a concise sample answer (2-4 bullet points) grounded in the candidate's resume
+3) Questions the candidate should ask the interviewer (3-5 bullets)
+4) Key talking points and achievements to emphasize (bullets)
+5) Company context: infer company/role themes from the job description only (no external browsing)
 
-Be specific, actionable, and tailored to the candidate's experience. Extract any company name or details from the job description."""
+Rules:
+- Keep it concise and scannable with headers and bullets.
+- Do not hallucinate experience beyond the resume content.
+- If resume is sparse, give best-effort but note assumptions.
+- If company name is visible in the job description, incorporate it in context and answers."""
 
-    user_message = f"""Generate comprehensive interview preparation materials for this position:
+    user_message = f"""Generate the full interview prep packet for this position:
 
 JOB DESCRIPTION:
 {job_description}
@@ -253,7 +192,7 @@ JOB DESCRIPTION:
 CANDIDATE'S RESUME:
 {resume_text}
 
-Create detailed interview prep that will help this candidate succeed in interviews for this role. If you can identify the company from the job description, include company-specific insights."""
+Remember: exactly 10 questions with tags and sample answers, plus interviewer questions, talking points, and company context inferred from the JD."""
 
     try:
         client = get_openai_client()
@@ -264,6 +203,60 @@ Create detailed interview prep that will help this candidate succeed in intervie
                 {"role": "user", "content": user_message}
             ],
             temperature=0.7,
+            stream=True
+        )
+        
+        for chunk in stream:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+                
+    except Exception as e:
+        raise Exception(f"OpenAI API error: {str(e)}")
+
+
+def match_score_streaming(resume_text, job_description):
+    """
+    Compute an AI-driven match score and skill mapping with streaming.
+    Yields chunks of text as they're generated.
+    
+    Args:
+        resume_text (str): Candidate resume content
+        job_description (str): Job description
+    
+    Yields:
+        str: Chunks of the match score report as generated
+    """
+    system_prompt = """You are an expert hiring evaluator. Compare a candidate's resume to the job description.
+Return a clean, structured report with ONLY these 3 sections in order:
+
+1) Match Score: XX% (single line at the top; 0-100, weight required skills higher)
+2) Missing Skills: bullet list of gaps only (what they DON'T have)
+3) Matching Skills: bullet list of matches only (what they DO have)
+
+Rules:
+- Be specific; no fluff or generic advice.
+- Do not invent experience not present in the resume.
+- Keep each bullet tight (one line max).
+- NO other sections, headers, or explanations.
+- Start with "Match Score: XX%"."""
+
+    user_message = f"""Evaluate fit between this job and candidate. Output ONLY: Match Score %, Missing Skills bullets, Matching Skills bullets.
+
+JOB DESCRIPTION:
+{job_description}
+
+CANDIDATE RESUME:
+{resume_text}"""
+
+    try:
+        client = get_openai_client()
+        stream = client.chat.completions.create(
+            model="gpt-4.1-nano",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ],
+            temperature=0.3,
             stream=True
         )
         

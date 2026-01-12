@@ -6,7 +6,7 @@ urlpatterns = [
     path('tailor-resume/', views.tailor_resume_direct_view, name='tailor-resume'),
     path('generate-cover-letter/', views.generate_cover_letter_view, name='generate-cover-letter'),
     path('generate-interview-prep/', views.generate_interview_prep_view, name='generate-interview-prep'),
-        path('analyze-skills/', views.analyze_skills_view, name='analyze-skills'),
+    path('match-score/', views.match_score_view, name='match-score'),
     
     # Generation history
     path('generations/', views.list_generations_view, name='list-generations'),

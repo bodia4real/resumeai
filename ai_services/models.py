@@ -11,7 +11,7 @@ class AIGeneration(models.Model):
         ('tailored_resume', 'Tailored Resume'),
         ('cover_letter', 'Cover Letter'),
         ('interview_prep', 'Interview Preparation'),
-            ('skills_analysis', 'Skills Analysis'),
+        ('match_score', 'Match Score'),
     ]
     
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ai_generations')
