@@ -22,7 +22,7 @@ class Migration(migrations.Migration):
                 ('prompt_type', models.CharField(choices=[('resume', 'Resume'), ('cover_letter', 'Cover Letter'), ('skills', 'Skills')], max_length=20)),
                 ('input_text', models.TextField()),
                 ('output_text', models.TextField()),
-                ('model_used', models.CharField(default='gpt-4', max_length=100)),
+                ('model_used', models.CharField(default='gpt-4.1-nano', max_length=100)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('application', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='applications.jobapplication')),
                 ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),

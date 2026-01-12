@@ -3,19 +3,40 @@ from django.contrib.auth.models import User
 
 
 class AIGeneration(models.Model):
-    PROMPT_TYPE_CHOICES = [
-        ('resume', 'Resume'),
+    """
+    Stores AI-generated content (tailored resumes, cover letters, etc.)
+    Tracks what was generated, when, and for which application.
+    """
+    GENERATION_TYPE_CHOICES = [
+        ('tailored_resume', 'Tailored Resume'),
         ('cover_letter', 'Cover Letter'),
-        ('skills', 'Skills'),
+        ('interview_prep', 'Interview Preparation'),
     ]
     
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    application = models.ForeignKey('applications.JobApplication', on_delete=models.CASCADE)
-    prompt_type = models.CharField(max_length=20, choices=PROMPT_TYPE_CHOICES)
-    input_text = models.TextField()
-    output_text = models.TextField()
-    model_used = models.CharField(max_length=100, default='gpt-4')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ai_generations')
+    application = models.ForeignKey('applications.JobApplication', on_delete=models.CASCADE, null=True, blank=True, related_name='ai_generations')
+    generation_type = models.CharField(max_length=20, choices=GENERATION_TYPE_CHOICES)
+    
+    # Inputs
+    input_resume = models.TextField(blank=True, null=True, help_text="Original resume text")
+    job_description = models.TextField(help_text="Job description used for generation")
+    job_url = models.URLField(blank=True, null=True, help_text="Original job posting URL if scraped")
+    
+    # Output
+    output_text = models.TextField(help_text="AI-generated content")
+    
+    # Metadata
+    model_used = models.CharField(max_length=100, default='gpt-4.1-nano', help_text="OpenAI model used")
+    tokens_used = models.IntegerField(null=True, blank=True, help_text="Total tokens consumed")
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['application']),
+        ]
+
     def __str__(self):
-        return f"{self.prompt_type} for {self.application}"
+        app_name = f" for {self.application}" if self.application else ""
+        return f"{self.get_generation_type_display()}{app_name} - {self.created_at.strftime('%Y-%m-%d')}"
