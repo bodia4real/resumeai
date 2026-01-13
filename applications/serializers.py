@@ -10,13 +10,16 @@ class CompanySerializer(serializers.ModelSerializer):
 
 class JobApplicationSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(write_only=True)
+    job_url = serializers.CharField(source='application_url', allow_blank=True, allow_null=True, required=False)
     company_details = CompanySerializer(source='company', read_only=True)
     
     class Meta:
         model = JobApplication
-        fields = ['id', 'company_name', 'company_details', 'position', 'job_description', 
-                  'application_url', 'status', 'date_saved', 'date_applied', 'date_interview', 
-                  'date_offer', 'salary_range', 'notes', 'created_at', 'updated_at']
+        fields = [
+            'id', 'company_name', 'company_details', 'position', 'job_description',
+            'job_url', 'application_url', 'status', 'date_saved', 'date_applied', 'date_interview',
+            'date_offer', 'location', 'salary_range', 'notes', 'created_at', 'updated_at'
+        ]
         read_only_fields = ['created_at', 'updated_at', 'company_details']
     
     def create(self, validated_data):

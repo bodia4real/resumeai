@@ -12,11 +12,57 @@ from .services.openai_service import (
     generate_cover_letter,
     generate_interview_prep,
     match_score_streaming,
+    extract_job_details_from_html,
 )
+from .services.job_scraper import scrape_job_description, clean_job_description
 from .services.prompts import get_resume_tailoring_prompt, get_interview_prep_prompt
 import tempfile
 import os
 import json
+import requests
+from bs4 import BeautifulSoup
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def scrape_job_url_view(request):
+    """
+    Scrape a job URL, clean the content, and extract structured details via OpenAI.
+
+    POST /api/ai/scrape-job/
+    Body: { "job_url": "https://..." }
+    """
+    job_url = request.data.get('job_url')
+    if not job_url:
+        return Response({'error': 'job_url is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        scraped = scrape_job_description(job_url)
+        raw_description = scraped.get('description', '') or ''
+        cleaned_description = clean_job_description(raw_description)
+
+        combined_content = (
+            f"Title: {scraped.get('title', '')}\n"
+            f"Company: {scraped.get('company', '')}\n"
+            f"URL: {job_url}\n"
+            f"Description:\n{cleaned_description}"
+        )
+
+        ai_result = extract_job_details_from_html(combined_content)
+
+        response_data = {
+            'job_url': job_url,
+            'company_name': ai_result.get('company_name') or scraped.get('company') or '',
+            'position': ai_result.get('position') or scraped.get('title') or '',
+            'location': ai_result.get('location') or '',
+            'salary_range': ai_result.get('salary_range') or '',
+            'description': ai_result.get('description') or cleaned_description or '',
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['POST'])

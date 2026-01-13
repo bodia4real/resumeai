@@ -5,6 +5,7 @@ Handles all communication with OpenAI API.
 Provides reusable functions for AI generation tasks.
 """
 import os
+import json
 from openai import OpenAI
 from django.conf import settings
 from decouple import config
@@ -266,3 +267,59 @@ CANDIDATE RESUME:
                 
     except Exception as e:
         raise Exception(f"OpenAI API error: {str(e)}")
+
+
+def extract_job_details_from_html(job_content):
+    """
+    Extract structured job details from raw HTML/text using OpenAI.
+    Returns a dict with company_name, position, location, salary_range, description.
+    """
+    system_prompt = """You are a precise information extractor. Given HTML or text of a job posting, return only JSON with:
+{
+  "company_name": string | null,
+  "position": string | null,
+  "location": string | null,
+  "salary_range": string | null,
+  "description": string | null  // concise cleaned description (no HTML)
+}
+
+Rules:
+- Keep values short and human-readable.
+- If salary appears, include the range or value as written (e.g., "$120k-$150k", "$55/hour").
+- If a field is missing, set it to null.
+- Do not invent details.
+- Respond with JSON only, no prose."""
+
+    user_message = f"""Extract the job details from this content:
+
+{job_content}
+"""
+
+    try:
+        client = get_openai_client()
+        response = client.chat.completions.create(
+            model="gpt-4.1-nano",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+            temperature=0.0,
+        )
+
+        raw_content = response.choices[0].message.content
+        try:
+            return json.loads(raw_content)
+        except json.JSONDecodeError:
+            # Best-effort fallback if the response isn't valid JSON
+            cleaned = raw_content.strip().strip('`')
+            return json.loads(cleaned)
+    except json.JSONDecodeError:
+        return {
+            "company_name": None,
+            "position": None,
+            "location": None,
+            "salary_range": None,
+            "description": None,
+        }
+    except Exception as e:
+        raise Exception(f"OpenAI extraction error: {str(e)}")
