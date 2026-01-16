@@ -11,15 +11,37 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { StatusBadge } from '@/components/StatusBadge';
-import { Plus, MapPin, DollarSign, ExternalLink, Loader2, Briefcase } from 'lucide-react';
+import { Plus, MapPin, DollarSign, ExternalLink, Briefcase, Calendar, Filter, LayoutGrid, List } from 'lucide-react';
 import type { Application } from '@/lib/api';
 
 type StatusFilter = 'all' | 'saved' | 'applied' | 'interview' | 'offer' | 'rejected';
+type ViewMode = 'grid' | 'list';
+
+// Skeleton for loading state
+function SkeletonCard() {
+  return (
+    <div className="rounded-xl border bg-card p-6 shadow-card">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 space-y-3">
+          <div className="skeleton h-6 w-48 rounded" />
+          <div className="skeleton h-4 w-32 rounded" />
+          <div className="flex gap-3 mt-4">
+            <div className="skeleton h-6 w-20 rounded-full" />
+            <div className="skeleton h-4 w-24 rounded" />
+            <div className="skeleton h-4 w-20 rounded" />
+          </div>
+        </div>
+        <div className="skeleton h-8 w-8 rounded" />
+      </div>
+    </div>
+  );
+}
 
 export default function Applications() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [filteredApps, setFilteredApps] = useState<Application[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [isLoading, setIsLoading] = useState(true);
 
   const { isLoggedIn } = useAuth();
@@ -49,48 +71,95 @@ export default function Applications() {
     }
   }, [applications, statusFilter]);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  // Status counts for filter badges
+  const statusCounts = {
+    all: applications.length,
+    saved: applications.filter(a => a.status === 'saved').length,
+    applied: applications.filter(a => a.status === 'applied').length,
+    interview: applications.filter(a => a.status === 'interview').length,
+    offer: applications.filter(a => a.status === 'offer').length,
+    rejected: applications.filter(a => a.status === 'rejected').length,
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Applications</h1>
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Applications</h1>
+          <p className="text-muted-foreground mt-1">
+            {applications.length} total application{applications.length !== 1 ? 's' : ''}
+          </p>
+        </div>
         <Link to="/applications/new">
-          <Button className="gap-2">
+          <Button className="gap-2 shadow-sm hover-lift">
             <Plus className="h-4 w-4" />
             Add Application
           </Button>
         </Link>
       </div>
 
-      {/* Filter */}
-      <div className="flex items-center gap-4">
-        <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as StatusFilter)}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="saved">Saved</SelectItem>
-            <SelectItem value="applied">Applied</SelectItem>
-            <SelectItem value="interview">Interview</SelectItem>
-            <SelectItem value="offer">Offer</SelectItem>
-            <SelectItem value="rejected">Rejected</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Filters & View Toggle */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as StatusFilter)}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status ({statusCounts.all})</SelectItem>
+              <SelectItem value="saved">Saved ({statusCounts.saved})</SelectItem>
+              <SelectItem value="applied">Applied ({statusCounts.applied})</SelectItem>
+              <SelectItem value="interview">Interview ({statusCounts.interview})</SelectItem>
+              <SelectItem value="offer">Offer ({statusCounts.offer})</SelectItem>
+              <SelectItem value="rejected">Rejected ({statusCounts.rejected})</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* View Toggle */}
+        <div className="flex items-center gap-1 p-1 rounded-lg bg-muted">
+          <Button
+            variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-8 px-3"
+            onClick={() => setViewMode('grid')}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-8 px-3"
+            onClick={() => setViewMode('list')}
+          >
+            <List className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
-      {/* Applications Grid */}
-      {filteredApps.length === 0 ? (
+      {/* Applications */}
+      {isLoading ? (
+        <div className={viewMode === 'grid' ? 'grid md:grid-cols-2 gap-4' : 'space-y-3'}>
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+      ) : filteredApps.length === 0 ? (
         <div className="rounded-xl border bg-card p-12 text-center shadow-card">
-          <Briefcase className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground mb-4">No applications found</p>
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+            <Briefcase className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h3 className="font-medium text-lg mb-2">
+            {statusFilter === 'all' ? 'No applications yet' : `No ${statusFilter} applications`}
+          </h3>
+          <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+            {statusFilter === 'all'
+              ? 'Start tracking your job applications to see them here'
+              : 'Try changing the filter to see other applications'}
+          </p>
           <Link to="/applications/new">
             <Button className="gap-2">
               <Plus className="h-4 w-4" />
@@ -99,55 +168,66 @@ export default function Applications() {
           </Link>
         </div>
       ) : (
-        <div className="grid gap-4">
+        <div className={
+          viewMode === 'grid'
+            ? 'grid md:grid-cols-2 gap-4'
+            : 'space-y-3'
+        }>
           {filteredApps.map((app, index) => (
             <Link
               key={app.id}
               to={`/applications/${app.id}/edit`}
-              className="group rounded-xl border bg-card p-6 shadow-card transition-all hover:shadow-elevated hover:-translate-y-0.5 animate-fade-in"
-              style={{ animationDelay: `${index * 50}ms` }}
+              className={`
+                group rounded-xl border bg-card shadow-card card-interactive
+                animate-stagger-fade-up
+                ${viewMode === 'grid' ? 'p-6' : 'p-4'}
+              `}
+              style={{ animationDelay: `${Math.min(index, 8) * 50}ms` }}
             >
-              <div className="flex items-start justify-between gap-4">
+              <div className={`flex items-start justify-between gap-4 ${viewMode === 'list' ? 'flex-row' : ''}`}>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">
+                  <h3 className={`font-semibold group-hover:text-primary transition-colors truncate ${viewMode === 'grid' ? 'text-lg' : 'text-base'}`}>
                     {app.position}
                   </h3>
-                  <p className="text-muted-foreground">{app.company_name}</p>
-                  
-                  <div className="flex flex-wrap items-center gap-4 mt-4">
+                  <p className="text-muted-foreground truncate">{app.company_name}</p>
+
+                  <div className={`flex flex-wrap items-center gap-3 ${viewMode === 'grid' ? 'mt-4' : 'mt-2'}`}>
                     <StatusBadge status={app.status as any} />
-                    
+
                     {app.location && (
                       <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <MapPin className="h-4 w-4" />
-                        {app.location}
+                        <MapPin className="h-3.5 w-3.5" />
+                        <span className="truncate max-w-[120px]">{app.location}</span>
                       </div>
                     )}
-                    
-                    {app.salary_range && (
+
+                    {app.salary_range && viewMode === 'grid' && (
                       <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <DollarSign className="h-4 w-4" />
-                        {app.salary_range}
+                        <DollarSign className="h-3.5 w-3.5" />
+                        <span>{app.salary_range}</span>
                       </div>
                     )}
-                    
-                    <span className="text-sm text-muted-foreground">
-                      {new Date(app.date_applied).toLocaleDateString()}
-                    </span>
+
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <Calendar className="h-3.5 w-3.5" />
+                      <span>{app.date_applied ? new Date(app.date_applied).toLocaleDateString() : 'No date'}</span>
+                    </div>
                   </div>
                 </div>
-                
-                {app.job_url && (
-                  <a
-                    href={app.job_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-primary hover:text-primary/80 flex-shrink-0"
-                  >
-                    <ExternalLink className="h-5 w-5" />
-                  </a>
-                )}
+
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {app.job_url && (
+                    <a
+                      href={app.job_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="p-2 rounded-lg hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  )}
+                </div>
               </div>
             </Link>
           ))}

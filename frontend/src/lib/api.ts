@@ -29,8 +29,51 @@ export interface ApplicationFormData {
   job_url: string;
   location: string;
   salary_range: string;
-  date_applied: string;
+  date_saved?: string | null;
+  date_applied?: string | null;
+  date_interview?: string | null;
+  date_offer?: string | null;
+  date_rejected?: string | null;
   notes: string;
+}
+
+// Document types
+export interface Document {
+  id: number;
+  user_id: number;
+  application?: number;
+  document_type: 'resume' | 'cover_letter' | 'other';
+  file: string;
+  file_name: string;
+  is_master: boolean;
+  file_url: string;
+  created_at: string;
+}
+
+// Company types
+export interface Company {
+  id: number;
+  name: string;
+  website?: string;
+  industry?: string;
+  notes?: string;
+  created_at: string;
+}
+
+// AI Generation types
+export interface AIGeneration {
+  id: number;
+  user_id: number;
+  application?: number;
+  generation_type: 'tailored_resume' | 'cover_letter' | 'interview_prep' | 'match_score';
+  generation_type_display: string;
+  input_resume: string;
+  job_description: string;
+  job_url?: string;
+  output_text: string;
+  model_used: string;
+  tokens_used?: number;
+  created_at: string;
 }
 
 export interface User {
@@ -138,22 +181,35 @@ const applicationsAPI = {
   },
   
   create: async (data: ApplicationFormData): Promise<Application> => {
+    // Ensure all date fields are either YYYY-MM-DD or null
+    const fixDate = (d: string | null | undefined) => d && d.length >= 10 ? d.slice(0, 10) : null;
     const payload = {
       ...data,
       application_url: data.job_url,
       location: data.location,
       job_url: undefined,
+      date_saved: fixDate(data.date_saved),
+      date_applied: fixDate(data.date_applied),
+      date_interview: fixDate(data.date_interview),
+      date_offer: fixDate(data.date_offer),
+      date_rejected: fixDate((data as any).date_rejected),
     } as any;
     const response = await axiosInstance.post('/applications/', payload);
     return response.data;
   },
-  
+
   update: async (id: string | number, data: ApplicationFormData): Promise<Application> => {
+    const fixDate = (d: string | null | undefined) => d && d.length >= 10 ? d.slice(0, 10) : null;
     const payload = {
       ...data,
       application_url: data.job_url,
       location: data.location,
       job_url: undefined,
+      date_saved: fixDate(data.date_saved),
+      date_applied: fixDate(data.date_applied),
+      date_interview: fixDate(data.date_interview),
+      date_offer: fixDate(data.date_offer),
+      date_rejected: fixDate((data as any).date_rejected),
     } as any;
     const response = await axiosInstance.put(`/applications/${id}/`, payload);
     return response.data;
@@ -396,10 +452,108 @@ const aiServicesAPI = {
   },
 };
 
+// Documents endpoints
+const documentsAPI = {
+  getAll: async (): Promise<Document[]> => {
+    const response = await axiosInstance.get('/documents/');
+    return response.data;
+  },
+
+  getById: async (id: number): Promise<Document> => {
+    const response = await axiosInstance.get(`/documents/${id}/`);
+    return response.data;
+  },
+
+  upload: async (
+    file: File,
+    documentType: 'resume' | 'cover_letter' | 'other',
+    isMaster?: boolean,
+    applicationId?: number
+  ): Promise<Document> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('document_type', documentType);
+    if (isMaster) formData.append('is_master', 'true');
+    if (applicationId) formData.append('application', applicationId.toString());
+
+    const response = await axiosInstance.post('/documents/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await axiosInstance.delete(`/documents/${id}/`);
+  },
+};
+
+// Companies endpoints
+const companiesAPI = {
+  getAll: async (): Promise<Company[]> => {
+    const response = await axiosInstance.get('/companies/');
+    return response.data;
+  },
+
+  getById: async (id: number): Promise<Company> => {
+    const response = await axiosInstance.get(`/companies/${id}/`);
+    return response.data;
+  },
+
+  create: async (data: {
+    name: string;
+    website?: string;
+    industry?: string;
+    notes?: string;
+  }): Promise<Company> => {
+    const response = await axiosInstance.post('/companies/', data);
+    return response.data;
+  },
+
+  update: async (
+    id: number,
+    data: {
+      name?: string;
+      website?: string;
+      industry?: string;
+      notes?: string;
+    }
+  ): Promise<Company> => {
+    const response = await axiosInstance.put(`/companies/${id}/`, data);
+    return response.data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await axiosInstance.delete(`/companies/${id}/`);
+  },
+};
+
+// AI Generations history endpoints
+const aiGenerationsAPI = {
+  getAll: async (params?: {
+    type?: string;
+    application_id?: number;
+  }): Promise<AIGeneration[]> => {
+    const response = await axiosInstance.get('/ai/generations/', { params });
+    return response.data;
+  },
+
+  getById: async (id: number): Promise<AIGeneration> => {
+    const response = await axiosInstance.get(`/ai/generations/${id}/`);
+    return response.data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await axiosInstance.delete(`/ai/generations/${id}/`);
+  },
+};
+
 // Export as grouped object
 export const api = {
   authAPI,
   applicationsAPI,
   analyticsAPI,
   aiServicesAPI,
+  documentsAPI,
+  companiesAPI,
+  aiGenerationsAPI,
 };
