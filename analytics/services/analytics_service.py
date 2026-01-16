@@ -16,40 +16,54 @@ def get_application_stats(user):
     """
     Get overall application statistics for a user.
     
-    IMPORTANT: 'saved' applications are EXCLUDED from all counts.
-    Only applications with status: applied, interview, offer, rejected are counted.
+    Returns statistics including all application statuses.
     
     Returns:
         dict: {
-            'total_applications': int (counted statuses only),
-            'by_status': {status: count},
+            'total_applications': int (all applications including saved),
+            'saved_applications': int,
+            'applications_applied': int,
+            'interviews': int,
+            'offers': int,
+            'rejected': int,
             'response_rate': float (percentage),
-            'avg_time_to_response': float (days)
+            'avg_days_to_response': float (days)
         }
     """
-    # Only get applications that are counted (exclude 'saved')
-    applications = JobApplication.objects.filter(user=user, status__in=COUNTED_STATUSES)
-    total = applications.count()
+    # Get all applications
+    all_applications = JobApplication.objects.filter(user=user)
+    total = all_applications.count()
+    
+    # Count by status
+    status_counts = all_applications.values('status').annotate(count=Count('status'))
+    by_status = {item['status']: item['count'] for item in status_counts}
+    
+    # Extract individual counts
+    saved_count = by_status.get('saved', 0)
+    applied_count = by_status.get('applied', 0)
+    interview_count = by_status.get('interview', 0)
+    offer_count = by_status.get('offer', 0)
+    rejected_count = by_status.get('rejected', 0)
     
     if total == 0:
         return {
             'total_applications': 0,
-            'by_status': {},
+            'saved_applications': 0,
+            'applications_applied': 0,
+            'interviews': 0,
+            'offers': 0,
+            'rejected': 0,
             'response_rate': 0.0,
-            'avg_time_to_response': 0.0
+            'avg_days_to_response': 0.0
         }
     
-    # Count by status (only counted statuses)
-    status_counts = applications.values('status').annotate(count=Count('status'))
-    by_status = {item['status']: item['count'] for item in status_counts}
-    
-    # Calculate response rate (interview + offer + rejected) / total counted
-    responded_count = len([s for s in RESPONSE_STATUSES if s in by_status]) 
-    responded_count = sum(by_status.get(s, 0) for s in RESPONSE_STATUSES)
-    response_rate = (responded_count / total * 100) if total > 0 else 0.0
+    # Calculate response rate (interview + offer + rejected) / total (excluding saved)
+    counted_total = applied_count + interview_count + offer_count + rejected_count
+    responded_count = interview_count + offer_count + rejected_count
+    response_rate = (responded_count / counted_total * 100) if counted_total > 0 else 0.0
     
     # Calculate average time to response (only for applications with a response)
-    responded_apps = applications.filter(
+    responded_apps = all_applications.filter(
         status__in=RESPONSE_STATUSES
     ).exclude(date_applied__isnull=True)
     
@@ -63,9 +77,13 @@ def get_application_stats(user):
     
     return {
         'total_applications': total,
-        'by_status': by_status,
+        'saved_applications': saved_count,
+        'applications_applied': applied_count,
+        'interviews': interview_count,
+        'offers': offer_count,
+        'rejected': rejected_count,
         'response_rate': round(response_rate, 2),
-        'avg_time_to_response': round(avg_time, 1)
+        'avg_days_to_response': round(avg_time, 1)
     }
 
 
@@ -98,12 +116,12 @@ def get_timeline_data(user):
     Get timeline of applications over time.
     
     Returns:
-        dict: {'dates': [...], 'counts': [...]}
+        list: [{'date': str, 'count': int}]
     """
     applications = JobApplication.objects.filter(user=user).order_by('created_at')
     
     if not applications.exists():
-        return {'dates': [], 'counts': []}
+        return []
     
     # Convert to DataFrame
     df = pd.DataFrame(list(applications.values('created_at')))
@@ -120,10 +138,10 @@ def get_timeline_data(user):
     # Convert to cumulative count
     timeline['cumulative'] = timeline['count'].cumsum()
     
-    return {
-        'dates': [str(d) for d in timeline['date'].tolist()],
-        'counts': timeline['cumulative'].tolist()
-    }
+    return [
+        {'date': str(d), 'count': int(c)}
+        for d, c in zip(timeline['date'].tolist(), timeline['cumulative'].tolist())
+    ]
 
 
 def get_top_companies(user, limit=10):
@@ -131,12 +149,12 @@ def get_top_companies(user, limit=10):
     Get top companies by application count.
     
     Returns:
-        list: [{'company': str, 'count': int}]
+        list: [{'company_name': str, 'count': int}]
     """
     applications = JobApplication.objects.filter(user=user)
     company_counts = applications.values('company__name').annotate(count=Count('id')).order_by('-count')[:limit]
     
     return [
-        {'company': item['company__name'], 'count': item['count']}
+        {'company_name': item['company__name'] or 'Unknown', 'count': item['count']}
         for item in company_counts
     ]

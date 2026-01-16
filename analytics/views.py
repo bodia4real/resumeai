@@ -28,13 +28,11 @@ def analytics_overview_view(request):
 @permission_classes([IsAuthenticated])
 def analytics_charts_view(request):
     try:
-        status_dist = get_status_distribution(request.user)
         timeline = get_timeline_data(request.user)
         top_companies = get_top_companies(request.user, limit=10)
         
         return Response({
-            'status_distribution': status_dist,
-            'timeline': timeline,
+            'applications_by_date': timeline,
             'top_companies': top_companies
         })
     except Exception as e:
