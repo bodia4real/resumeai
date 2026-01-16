@@ -12,13 +12,19 @@ class JobApplicationSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(write_only=True)
     job_url = serializers.CharField(source='application_url', allow_blank=True, allow_null=True, required=False)
     company_details = CompanySerializer(source='company', read_only=True)
-    
+
+    date_saved = serializers.DateField(format="%Y-%m-%d", input_formats=["%Y-%m-%d"], required=False, allow_null=True)
+    date_applied = serializers.DateField(format="%Y-%m-%d", input_formats=["%Y-%m-%d"], required=False, allow_null=True)
+    date_interview = serializers.DateField(format="%Y-%m-%d", input_formats=["%Y-%m-%d"], required=False, allow_null=True)
+    date_offer = serializers.DateField(format="%Y-%m-%d", input_formats=["%Y-%m-%d"], required=False, allow_null=True)
+    date_rejected = serializers.DateField(format="%Y-%m-%d", input_formats=["%Y-%m-%d"], required=False, allow_null=True)
+
     class Meta:
         model = JobApplication
         fields = [
             'id', 'company_name', 'company_details', 'position', 'job_description',
             'job_url', 'application_url', 'status', 'date_saved', 'date_applied', 'date_interview',
-            'date_offer', 'location', 'salary_range', 'notes', 'created_at', 'updated_at'
+            'date_offer', 'date_rejected', 'location', 'salary_range', 'notes', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at', 'company_details']
     

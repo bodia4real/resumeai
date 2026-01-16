@@ -18,6 +18,8 @@ class CompanyViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
 
+from rest_framework.response import Response
+
 class JobApplicationViewSet(viewsets.ModelViewSet):
     """
     ViewSet for Job Application CRUD operations.
@@ -49,3 +51,8 @@ class JobApplicationViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         # Automatically set the user to the logged-in user
         serializer.save(user=self.request.user)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete()
+        return Response(status=204)
