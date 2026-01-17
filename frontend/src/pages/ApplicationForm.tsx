@@ -107,6 +107,8 @@ export default function ApplicationForm() {
       } else {
         await api.applicationsAPI.create(formData);
       }
+      // Clear job_url after save
+      setFormData({ ...formData, job_url: '' });
       navigate('/applications');
     } catch (err: any) {
       const data = err.response?.data;
@@ -146,12 +148,18 @@ export default function ApplicationForm() {
 
     try {
       const result = await api.aiServicesAPI.scrapeJobDetails(formData.job_url);
+      // Append tracking info to notes
+      let newNotes = formData.notes || '';
+      if (result.tracking_info) {
+        newNotes += (newNotes ? '\n\n' : '') + `Tracking info: ${result.tracking_info}`;
+      }
       setFormData({
         ...formData,
         company_name: result.company_name || formData.company_name,
         position: result.position || formData.position,
         location: result.location || formData.location,
         salary_range: result.salary_range || formData.salary_range,
+        notes: newNotes,
       });
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to auto-fill from URL');
