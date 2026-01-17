@@ -210,7 +210,11 @@ export default function Applications() {
 
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Calendar className="h-3.5 w-3.5" />
-                      <span>{app.date_applied ? new Date(app.date_applied).toLocaleDateString() : 'No date'}</span>
+                      <span>{
+                        app.status === 'saved'
+                          ? (app.date_saved ? new Date(app.date_saved).toLocaleDateString() : 'No date')
+                          : (app.date_applied ? new Date(app.date_applied).toLocaleDateString() : 'No date')
+                      }</span>
                     </div>
                   </div>
                 </div>
