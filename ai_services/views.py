@@ -51,12 +51,14 @@ def scrape_job_url_view(request):
         ai_result = extract_job_details_from_html(combined_content)
 
         response_data = {
-            'job_url': job_url,
-            'company_name': ai_result.get('company_name') or scraped.get('company') or '',
-            'position': ai_result.get('position') or scraped.get('title') or '',
-            'location': ai_result.get('location') or '',
-            'salary_range': ai_result.get('salary_range') or '',
-            'description': ai_result.get('description') or cleaned_description or '',
+              'job_url': job_url,
+              'company_name': ai_result.get('company_name') or scraped.get('company') or '',
+              'position': ai_result.get('position') or scraped.get('title') or '',
+              'location': ai_result.get('location') or '',
+              'salary_range': ai_result.get('salary_range') or '',
+              'description': ai_result.get('description') or cleaned_description or '',
+              # Add tracking info (link or instructions)
+              'tracking_info': ai_result.get('tracking_info') or f'Track your application at: {job_url}'
         }
 
         return Response(response_data, status=status.HTTP_200_OK)
