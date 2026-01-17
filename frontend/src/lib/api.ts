@@ -183,11 +183,10 @@ const applicationsAPI = {
   create: async (data: ApplicationFormData): Promise<Application> => {
     // Ensure all date fields are either YYYY-MM-DD or null
     const fixDate = (d: string | null | undefined) => d && d.length >= 10 ? d.slice(0, 10) : null;
+    const { job_url, ...rest } = data;
     const payload = {
-      ...data,
-      application_url: data.job_url,
+      ...rest,
       location: data.location,
-      job_url: undefined,
       date_saved: fixDate(data.date_saved),
       date_applied: fixDate(data.date_applied),
       date_interview: fixDate(data.date_interview),
@@ -200,11 +199,10 @@ const applicationsAPI = {
 
   update: async (id: string | number, data: ApplicationFormData): Promise<Application> => {
     const fixDate = (d: string | null | undefined) => d && d.length >= 10 ? d.slice(0, 10) : null;
+    const { job_url, ...rest } = data;
     const payload = {
-      ...data,
-      application_url: data.job_url,
+      ...rest,
       location: data.location,
-      job_url: undefined,
       date_saved: fixDate(data.date_saved),
       date_applied: fixDate(data.date_applied),
       date_interview: fixDate(data.date_interview),
